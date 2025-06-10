@@ -34,7 +34,7 @@ class FedAvgStrategy(Strategy):
     ) -> List[Tuple[ClientProxy, FitIns]]:
         
        
-        sample_size = max(1, int(0.3 * client_manager.num_available()))
+        sample_size = max(1, int(0.4 * client_manager.num_available()))
         clients = client_manager.sample(
             num_clients=sample_size,
             min_num_clients=1,  
@@ -44,8 +44,8 @@ class FedAvgStrategy(Strategy):
         
         config = {
             "server_round": server_round,
-            "epochs": 1, 
-            "batch_size": 32, 
+            "epochs": 3, 
+            "batch_size": 64, 
             "learning_rate": 0.01 
         }
         
@@ -90,16 +90,16 @@ class FedAvgStrategy(Strategy):
         parameters: Parameters,
         client_manager: ClientManager
     ) -> List[Tuple[ClientProxy, EvaluateIns]]:
-        """Configure the next round of evaluation."""
+       
        
         eval_clients = client_manager.sample(
-            num_clients=max(2, int(0.2 * client_manager.num_available())),
+            num_clients=max(2, int(0.3 * client_manager.num_available())),
             min_num_clients=1
         )
         
         config = {
             "server_round": server_round,
-            "batch_size": 32  
+            "batch_size": 64  
         }
         
         evaluate_ins = EvaluateIns(parameters=parameters, config=config)
@@ -124,5 +124,5 @@ class FedAvgStrategy(Strategy):
     def evaluate(
         self, server_round: int, parameters: Parameters
     ) -> Optional[Tuple[float, Dict[str, Scalar]]]:
-        """Centralized evaluation (optional)"""
+        
         return None

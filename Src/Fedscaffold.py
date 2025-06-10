@@ -11,16 +11,18 @@ import numpy as np
 import time
 import json
 
+
+
 class SCAFFOLDStrategy(Strategy):
     def __init__(
         self,
         initial_parameters: Optional[Parameters] = None,
         server_learning_rate: float = 0.01,
-        fraction_fit: float = 0.5,  # Matches FedAvg's 0.3 sampling
-        fraction_evaluate: float = 1.0,  # Matches FedAvg's 0.2 sampling
-        min_fit_clients: int = 1,  # Minimum 1 client for fit
-        min_evaluate_clients: int = 2,  # Minimum 1 client for evaluate
-        min_available_clients: int = 1,  # Minimum 1 client to start
+        fraction_fit: float = 0.4, 
+        fraction_evaluate: float = 0.3,  
+        min_fit_clients: int = 1, 
+        min_evaluate_clients: int = 2, 
+        min_available_clients: int = 1,  
     ):
         super().__init__()
         self.initial_parameters = initial_parameters
@@ -90,14 +92,14 @@ class SCAFFOLDStrategy(Strategy):
         for client in clients:
             cid = client.cid
             
-            # Initialize client control variate if not exists
+            
             if cid not in self.client_controls:
                 self.client_controls[cid] = [np.zeros_like(arr) for arr in self.c_global]
 
             # Prepare config with control variates
             config = {
                 "server_round": server_round,
-                "epochs": 1, 
+                "epochs": 3, 
                 "batch_size": 64,
                 "learning_rate": 0.01,
                 "global_control": json.dumps([arr.tolist() for arr in self.c_global]),
@@ -115,51 +117,59 @@ class SCAFFOLDStrategy(Strategy):
         results: List[Tuple[ClientProxy, FitRes]],
         failures: List[Union[Tuple[ClientProxy, FitRes], BaseException]]
     ) -> Tuple[Optional[Parameters], Dict[str, Scalar]]:
+        """Aggregate fit results using weighted average."""
         if not results:
             return None, {}
 
-        weights = []
-        num_examples = []
-        client_control_updates = []
-        
-        for client, fit_res in results:
-            # Get client parameters and example counts
-            client_params = parameters_to_ndarrays(fit_res.parameters)
-            weights.append(client_params)
-            num_examples.append(fit_res.num_examples)
+        # Extract weights and example counts
+        weights_results = []
+        for _, fit_res in results:
+            client_weights = parameters_to_ndarrays(fit_res.parameters)
+            num_examples = fit_res.num_examples
+            weights_results.append((client_weights, num_examples))
+
+        # Calculate weighted average of parameters
+        weights_prime = []
+        for i in range(len(weights_results[0][0])):
+            layer_weights = []
+            layer_examples = []
+            for client_weights, num_examples in weights_results:
+                layer_weights.append(client_weights[i])
+                layer_examples.append(num_examples)
             
-            # Extract client control updates if available
+            weighted_sum = np.sum(
+                [w * n for w, n in zip(layer_weights, layer_examples)],
+                axis=0
+            )
+            avg_layer = weighted_sum / sum(layer_examples)
+            weights_prime.append(avg_layer)
+
+        # Process control variate updates
+        client_control_updates = []
+        for client, fit_res in results:
             if "client_control_update" in fit_res.metrics:
-                client_control_updates.append(
-                    [np.array(arr) for arr in json.loads(fit_res.metrics["client_control_update"])]
-                )
-                # Update client's control variate
-                self.client_controls[client.cid] = client_control_updates[-1]
+                try:
+                    update = [np.array(arr) for arr in json.loads(fit_res.metrics["client_control_update"])]
+                    client_control_updates.append(update)
+                    self.client_controls[client.cid] = update
+                except (json.JSONDecodeError, KeyError) as e:
+                    print(f"Error processing control update from client {client.cid}: {e}")
 
-        # Calculate total examples for weighted averaging
-        total_examples = sum(num_examples)
-        
-        # Aggregate model parameters (standard FedAvg)
-        averaged_weights = [
-            sum(w[i] * n for w, n in zip(weights, num_examples)) / total_examples
-            for i in range(len(weights[0]))
-        ]
-
-        # SCAFFOLD-specific: Update global control variate
+        # Update global control variate
         if client_control_updates:
-            # Calculate the average client control update
+            example_counts = [fit_res.num_examples for _, fit_res in results]
+            total_examples = sum(example_counts)
+            
             avg_client_control_update = [
-                sum(update[i] for update in client_control_updates) / len(client_control_updates)
+                sum(
+                    update[i] * n for update, n in zip(client_control_updates, example_counts)
+                ) / total_examples
                 for i in range(len(client_control_updates[0]))
             ]
             
-            # Update global control variate with clipping
             self.c_global = [
-                np.clip(
-                    c_global + (avg_client_control_update[i] * self.server_learning_rate),
-                    -1.0, 1.0  # Clip to prevent explosion
-                )
-                for i, c_global in enumerate(self.c_global)
+                c_global + (avg_update * self.server_learning_rate)
+                for c_global, avg_update in zip(self.c_global, avg_client_control_update)
             ]
 
         # Aggregate metrics
@@ -168,7 +178,7 @@ class SCAFFOLDStrategy(Strategy):
             "train_accuracy": np.mean([res.metrics.get("train_accuracy", 0.0) for _, res in results]),
         }
 
-        return ndarrays_to_parameters(averaged_weights), metrics_aggregated
+        return ndarrays_to_parameters(weights_prime), metrics_aggregated
 
     def configure_evaluate(
         self,

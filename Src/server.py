@@ -11,7 +11,6 @@ from .client_manager import CustomClientManager
 from .Fedscaffold import SCAFFOLDStrategy
 
 def convert_metrics(metrics: Dict[str, List[tuple[int, float]]]) -> List[tuple[int, Dict[str, float]]]:
-    """Convert Flower metrics format for JSON serialization as list of tuples."""
     converted: Dict[int, Dict[str, float]] = {}
     for metric_name, metric_list in metrics.items():
         for round_num, val in metric_list:
@@ -21,7 +20,6 @@ def convert_metrics(metrics: Dict[str, List[tuple[int, float]]]) -> List[tuple[i
     return sorted(converted.items())
 
 def save_results(history: History, filename: str = "results.json") -> None:
-    """Save training results to a JSON file."""
     results = {
         "losses_distributed": [(rnd, float(loss)) for rnd, loss in history.losses_distributed],
         "metrics_distributed": convert_metrics(getattr(history, "metrics_distributed", {})),
@@ -43,7 +41,7 @@ def run_server(
     output_file: str = "results.json",
     mu: float = 0.1  # Add mu parameter
 ) -> History:
-    """Run Flower server, save history, and return it."""
+   
     config = fl.server.ServerConfig(num_rounds=num_rounds)
 
     if strategy is None:

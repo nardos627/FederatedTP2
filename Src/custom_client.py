@@ -54,7 +54,7 @@ class CustomClient(Client):
             self.model.set_model_parameters(global_params)
 
             metrics = {}
-            updated_params = None  # Initialize to ensure it's always defined
+            updated_params = None 
 
             if self.strategy_type == "fedprox":
                 criterion = nn.CrossEntropyLoss()
@@ -110,7 +110,7 @@ class CustomClient(Client):
                     "train_accuracy": accuracy
                 }
 
-            # Get updated parameters (must be after all training branches)
+            # Get updated parameters 
             updated_params = ndarrays_to_parameters(self.model.get_model_parameters())
 
             return FitRes(

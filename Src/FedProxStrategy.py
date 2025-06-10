@@ -37,7 +37,7 @@ class FedProxStrategy(FedAvgStrategy):
         # Sample clients using FedAvg logic
         sampled_clients = super().configure_fit(server_round, parameters, client_manager)
 
-        # Update configuration to include the Proximal term (mu)
+       
         config = {
             "server_round": server_round,
             "epochs": 3,
@@ -46,5 +46,5 @@ class FedProxStrategy(FedAvgStrategy):
             "mu": self.mu
         }
 
-        # Return new FitIns with Prox configuration
+       
         return [(client, FitIns(parameters=parameters, config=config)) for client, _ in sampled_clients]

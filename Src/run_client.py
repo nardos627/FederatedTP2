@@ -6,7 +6,7 @@ import torch
 import flwr as fl
 
 def run_client(cid: int, strategy_type: str = "fedavg", mu: float = 0.1) -> None:
-    """Run a single client instance."""
+    
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
     train_loader, val_loader = load_client_data(
@@ -33,7 +33,7 @@ def run_client(cid: int, strategy_type: str = "fedavg", mu: float = 0.1) -> None
     )
 
 def client_fn(cid: str, strategy_type: str = "fedavg", mu: float = 0.1):
-    """Return a Flower client instance for a given client ID (used in simulation)."""
+    
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     train_loader, val_loader = load_client_data(

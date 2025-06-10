@@ -14,14 +14,14 @@ class CustomFashionModel(nn.Module):
         self.conv1 = nn.Conv2d(1, 32, 3, 1)
         self.conv2 = nn.Conv2d(32, 64, 3, 1)
         
-        # No batch norm layers will be created since use_bn is False
+        
         self.dropout1 = nn.Dropout2d(0.25)
         self.dropout2 = nn.Dropout2d(0.5)
         self.fc1 = nn.Linear(9216, 128)
         self.fc2 = nn.Linear(128, 10)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # Simplified forward pass without BN checks
+       
         x = self.conv1(x)
         x = F.relu(x)
         x = self.conv2(x)
@@ -133,21 +133,26 @@ class CustomFashionModel(nn.Module):
         correct = 0
         total = 0
         
-        global_control_tensors = [torch.tensor(c, device=device) for c in global_control]
-        local_control_tensors = [torch.tensor(c, device=device) for c in local_control]
+        # Convert controls to tensors
+        global_control_tensors = [torch.tensor(c, device=device, dtype=torch.float32) for c in global_control]
+        local_control_tensors = [torch.tensor(c, device=device, dtype=torch.float32) for c in local_control]
+        
+        # Store initial parameters
         initial_params = [param.data.clone() for param in self.parameters()]
         
-        for data, target in train_loader:
+        for batch_idx, (data, target) in enumerate(train_loader):
             data, target = data.to(device), target.to(device)
             optimizer.zero_grad()
             output = self(data)
             
+            # Calculate loss
             loss = criterion(output, target)
             
-            # SCAFFOLD correction with scaling factor
+            # SCAFFOLD correction term
             correction = 0.0
             for param, c_global, c_local in zip(self.parameters(), global_control_tensors, local_control_tensors):
-                correction += torch.sum(param * (c_local - c_global)) * 0.1  # Added scaling factor
+                if param.grad is not None:
+                    correction += (c_local - c_global).dot(param.grad.view(-1))
             
             total_loss += loss.item()
             loss = loss - correction
@@ -155,17 +160,17 @@ class CustomFashionModel(nn.Module):
             loss.backward()
             optimizer.step()
             
+            # Calculate accuracy
             pred = output.argmax(dim=1, keepdim=True)
             correct += pred.eq(target.view_as(pred)).sum().item()
             total += target.size(0)
         
-        # Update local control with more conservative scaling
+        # Calculate updated local control
         updated_local_control = []
-        scaling_factor = lr * len(train_loader) * 10  # More conservative scaling
-        for param, init_param, c_global, c_local in zip(self.parameters(), initial_params, global_control_tensors, local_control_tensors):
-            delta_param = param.data - init_param
-            new_control = c_local - c_global - (delta_param / scaling_factor)
-            updated_local_control.append(new_control.cpu().numpy())
+        for param, init_param, c_global in zip(self.parameters(), initial_params, global_control_tensors):
+            delta_param = (init_param - param.data)  # Note the sign change
+            updated_control = c_global - delta_param / (lr * len(train_loader))
+            updated_local_control.append(updated_control.detach().cpu().numpy())
         
         avg_loss = total_loss / len(train_loader)
         accuracy = correct / total

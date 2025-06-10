@@ -12,7 +12,7 @@ def load_results(file_path: str) -> Dict:
         return json.loads(content)
 
 
-def compare_multiple_results(file_label_map: Dict[str, str], fig_dir: str = "./figures_comparecl") -> None:
+def compare_multiple_results(file_label_map: Dict[str, str], fig_dir: str = "./figures_comparescaffold") -> None:
     os.makedirs(fig_dir, exist_ok=True)
     all_results = {}
 
@@ -64,9 +64,9 @@ def compare_multiple_results(file_label_map: Dict[str, str], fig_dir: str = "./f
 if __name__ == "__main__":
  
     file_label_map = {
-        "results30c5.json": "Num-Client=5",
-        "results30.json": "Num-Clients=10",
-        "results30c15.json": "Num-Clients=15"
+        "resultsscaf19_alpha10.json": "Alpha=10",
+        "resultsscaf22_alpha1.json": "Alpha=1.0",
+        "resultsscaf24_alpha01.json": "Alpha=0.1"
     }
 
     compare_multiple_results(file_label_map)
