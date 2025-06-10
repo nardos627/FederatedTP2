@@ -46,3 +46,5 @@ python main.py run-client --cid=0 --strategy=scaffold
 - SCAFFOLD dominates across all heterogeneity levels (+5-23% over FedAvg)
 - FedProx most effective at μ=0.1 (optimal regularization)
 - FedAvg only suitable for near-IID data (α≥1.0)
+
+![graph](figures_compareAlg10/compare_val_accuracy.png)
